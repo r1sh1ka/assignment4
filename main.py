@@ -1,124 +1,72 @@
-
 import os
 import sqlite3
-import subprocess
-import urllib.request
+from flask import Flask, render_template_string, request
 
-def grade_calculator():
-    print("\n--- Student Grade Calculator ---")
+app = Flask(__name__)
 
-    student = input("Enter student name: ")
-    grade = input("Enter grade: ")
-
-    print(f"{student} received {grade}")
+ADMIN_API_KEY = "admin-secret-token-98765"
 
 
-def campus_announcements():
-    print("\n--- Campus Announcements ---")
-
-    announcements = [
-        "Welcome to the new semester!",
-        "Library hours: 8 AM - 10 PM",
-        "Join the campus coding club!"
-    ]
-
-    for announcement in announcements:
-        print(announcement)
+def init_db():
+  conn = sqlite3.connect("game.db")
+  cursor = conn.cursor()
+  cursor.execute(
+      "CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY, player TEXT,"
+      " score INT)"
+  )
+  conn.commit()
+  conn.close()
 
 
-def study_calculator():
-    print("\n--- Study Time Calculator ---")
-
-    hours = float(input("Hours studied: "))
-    days = int(input("Number of days: "))
-
-    print("Total study hours:", hours * days)
+init_db()
 
 
-def student_notes():
-    print("\n--- Student Notes ---")
-
-    filename = input("Enter notes filename: ")
-
-    with open(filename, "r") as file:
-        print(file.read())
-
-
-def database_search():
-    print("\n--- Student Database Search ---")
-
-    name = input("Enter student name: ")
-
-    connection = sqlite3.connect(":memory:")
-    connection.execute(
-        "CREATE TABLE students (name TEXT)"
-    )
-    connection.execute(
-        "INSERT INTO students VALUES ('Alice')"
-    )
-
-    query = "SELECT * FROM students WHERE name = '" + name + "'"
-    result = connection.execute(query).fetchall()
-
-    print(result)
-    connection.close()
+@app.route("/")
+def index():
+  return """
+    <h1>Welcome to the Mini Game Arcade!</h1>
+    <ul>
+        <li><a href="/calc?expr=2+2">Calculator</a></li>
+        <li><a href="/score?player=Alice">High Scores</a></li>
+        <li><a href="/profile?name=Player1">Player Profile</a></li>
+        <li><a href="/logs?file=game.log">View Logs</a></li>
+    </ul>
+    """
 
 
-def network_lookup():
-    print("\n--- Campus Network Lookup ---")
-
-    url = input("Enter a website URL: ")
-
-    response = urllib.request.urlopen(url, timeout=3)
-    print(response.status)
+@app.route("/calc")
+def calculator():
+  expr = request.args.get("expr", "0")
+  result = eval(expr)
+  return f"Result: {result}"
 
 
-def system_information():
-    print("\n--- System Information ---")
+@app.route("/score")
+def get_score():
+  player = request.args.get("player", "guest")
+  conn = sqlite3.connect("game.db")
+  cursor = conn.cursor()
+  query = "SELECT * FROM scores WHERE player = '" + player + "'"
+  cursor.execute(query)
+  scores = cursor.fetchall()
+  conn.close()
+  return str(scores)
 
-    command = input("Enter a system command: ")
 
-    subprocess.run(command, shell=True)
+@app.route("/logs")
+def view_logs():
+  filename = request.args.get("file", "game.log")
+  with open(filename, "r") as f:
+    content = f.read()
+  return f"<pre>{content}</pre>"
 
 
-def main():
-    while True:
-        print("\n==============================")
-        print("       CAMPUS TOOLKIT")
-        print("==============================")
-        print("1. Grade Calculator")
-        print("2. Campus Announcements")
-        print("3. Study Time Calculator")
-        print("4. Student Notes")
-        print("5. Database Search")
-        print("6. Network Lookup")
-        print("7. System Information")
-        print("8. Exit")
-
-        choice = input("\nChoose an option: ")
-
-        if choice == "1":
-            grade_calculator()
-        elif choice == "2":
-            campus_announcements()
-        elif choice == "3":
-            study_calculator()
-        elif choice == "4":
-            student_notes()
-        elif choice == "5":
-            database_search()
-        elif choice == "6":
-            network_lookup()
-        elif choice == "7":
-            system_information()
-        elif choice == "8":
-            print("Goodbye!")
-            break
-        else:
-            print("Invalid choice!")
+@app.route("/profile")
+def profile():
+  name = request.args.get("name", "Guest")
+  template = f"<h2>Player Profile: {name}</h2>"
+  return render_template_string(template)
 
 
 if __name__ == "__main__":
-    main()
-
-# test
+  app.run(debug=True)
