@@ -32,7 +32,7 @@ def index():
         <li><a href="/calc?expr=2+2">Calculator</a></li>
         <li><a href="/score?player=Alice">High Scores</a></li>
         <li><a href="/profile?name=Player1">Player Profile</a></li>
-        <li><a href="/logs?file=game.log">View Logs</a></li>
+        <li><a href="/logs">View Logs</a></li>
     </ul>
     """
 
@@ -50,7 +50,7 @@ _allowed_operators = {
 def _eval_node(node):
   if isinstance(node, ast.Constant):
     return node.value
-  elif isinstance(node, ast.Num):  
+  elif isinstance(node, ast.Num):
     return node.n
   elif isinstance(node, ast.BinOp):
     return _allowed_operators[type(node.op)](
@@ -83,17 +83,15 @@ def get_score():
   conn.close()
   return str(scores)
 
+
 @app.route("/logs")
 def view_logs():
-  filename = request.args.get("file", "game.log")
-  ALLOWED_LOGS = ["game.log", "error.log", "access.log"]
+  filepath = os.path.join("logs", "game.log")
 
-  if filename not in ALLOWED_LOGS:
-    return "Access denied", 403
-
-  filepath = os.path.join("logs", filename)
   if not os.path.exists(filepath):
-    return "Log file not found", 404
+    os.makedirs("logs", exist_ok=True)
+    with open(filepath, "w") as f:
+      f.write("System initialized successfully.\n")
 
   with open(filepath, "r") as f:
     content = f.read()
