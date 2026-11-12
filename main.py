@@ -1,7 +1,9 @@
+import ast
 import html
+import operator
 import os
 import sqlite3
-from flask import Flask, render_template_string, request
+from flask import Flask, request
 
 app = Flask(__name__)
 
@@ -35,15 +37,39 @@ def index():
     """
 
 
+_allowed_operators = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _eval_node(node):
+  if isinstance(node, ast.Constant):
+    return node.value
+  elif isinstance(node, ast.Num):  
+    return node.n
+  elif isinstance(node, ast.BinOp):
+    return _allowed_operators[type(node.op)](
+        _eval_node(node.left), _eval_node(node.right)
+    )
+  elif isinstance(node, ast.UnaryOp):
+    return _allowed_operators[type(node.op)](_eval_node(node.operand))
+  else:
+    raise TypeError(f"Unsupported operation")
+
+
 @app.route("/calc")
 def calculator():
   expr = request.args.get("expr", "0")
-  if not all(c in "0123456789+-*/(). " for c in expr):
-    return "Invalid expression characters", 400
   try:
-    result = eval(expr)
+    node = ast.parse(expr, mode="eval")
+    result = _eval_node(node.body)
   except Exception:
-    return "Calculation error", 400
+    return "Invalid calculation expression", 400
   return f"Result: {result}"
 
 
@@ -57,14 +83,18 @@ def get_score():
   conn.close()
   return str(scores)
 
-
 @app.route("/logs")
 def view_logs():
   filename = request.args.get("file", "game.log")
-  safe_filename = os.path.basename(filename)
-  filepath = os.path.join("logs", safe_filename)
+  ALLOWED_LOGS = ["game.log", "error.log", "access.log"]
+
+  if filename not in ALLOWED_LOGS:
+    return "Access denied", 403
+
+  filepath = os.path.join("logs", filename)
   if not os.path.exists(filepath):
     return "Log file not found", 404
+
   with open(filepath, "r") as f:
     content = f.read()
   return f"<pre>{content}</pre>"
@@ -74,8 +104,7 @@ def view_logs():
 def profile():
   name = request.args.get("name", "Guest")
   safe_name = html.escape(name)
-  template = f"<h2>Player Profile: {safe_name}</h2>"
-  return render_template_string(template)
+  return f"<h2>Player Profile: {safe_name}</h2>"
 
 
 if __name__ == "__main__":
